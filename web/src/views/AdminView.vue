@@ -1277,12 +1277,14 @@ async function loadSkinCatalog() {
 function skinName(skin: SkinCatalogEntry): string {
   if (skin.id === "builtin.light") return tr("skinDay");
   if (skin.id === "builtin.dark") return tr("skinNight");
+  if (skin.id === "builtin.discord") return "Discord";
   if (skin.id === "community.illusia-voice") return tr("skinIllusia");
   return skin.name;
 }
 function skinDescription(skin: SkinCatalogEntry): string {
   if (skin.id === "builtin.light") return tr("skinDayDescription");
   if (skin.id === "builtin.dark") return tr("skinNightDescription");
+  if (skin.id === "builtin.discord") return "Discord 1:1 authentic dark theme.";
   if (skin.id === "community.illusia-voice") return tr("skinIllusiaDescription");
   return skin.description || "";
 }

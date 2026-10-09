@@ -7,6 +7,7 @@ import { getBundledSkinPackageUrl, isPublicSkinEnabled } from "./skin-catalog.js
 export const ACTIVE_SKIN_KEY = "webspeak:active-skin";
 export const BUILTIN_LIGHT_SKIN = "builtin.light";
 export const BUILTIN_DARK_SKIN = "builtin.dark";
+export const BUILTIN_DISCORD_SKIN = "builtin.discord";
 const CUSTOM_STYLE_ID = "webspeak-active-custom-skin";
 const CUSTOM_BASE_STYLE_ID = "webspeak-active-custom-skin-base";
 
@@ -30,9 +31,9 @@ export async function activateStoredSkin(): Promise<InstalledSkin | null> {
 }
 
 export async function activateSkin(id: string, expectedVersion?: string, appVersion = "0.2.5"): Promise<InstalledSkin | null> {
-  if (id === BUILTIN_LIGHT_SKIN || id === BUILTIN_DARK_SKIN) {
+  if (id === BUILTIN_LIGHT_SKIN || id === BUILTIN_DARK_SKIN || id === BUILTIN_DISCORD_SKIN) {
     clearCustomSkinStyle();
-    applyTheme(id === BUILTIN_DARK_SKIN ? "dark" : "light");
+    applyTheme(id === BUILTIN_DISCORD_SKIN ? "discord" : (id === BUILTIN_DARK_SKIN ? "dark" : "light"));
     markCoreControls();
     storeSkinId(id);
     return null;

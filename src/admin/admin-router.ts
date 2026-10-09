@@ -388,6 +388,20 @@ function requireCsrf(sessions: AdminSessionStore) {
   };
 }
 
+function isOriginAllowed(originStr: string | undefined, hostStr: string | undefined): boolean {
+  if (!originStr || !hostStr) return false;
+  try {
+    const originUrl = new URL(originStr);
+    if (originUrl.host === hostStr) return true;
+    const isOriginLocal = originUrl.hostname === "localhost" || originUrl.hostname === "127.0.0.1" || originUrl.hostname === "::1";
+    const hostName = hostStr.split(":")[0];
+    const isHostLocal = hostName === "localhost" || hostName === "127.0.0.1" || hostName === "::1";
+    return isOriginLocal && isHostLocal;
+  } catch {
+    return false;
+  }
+}
+
 function requireSameOrigin(request: Request, response: Response, next: NextFunction): void {
   if (!request.is("application/json")) {
     response.status(415).json({ ok: false, code: "JSON_REQUIRED" });
@@ -395,9 +409,7 @@ function requireSameOrigin(request: Request, response: Response, next: NextFunct
   }
   const origin = request.header("origin");
   const host = request.header("host");
-  try {
-    if (!origin || !host || new URL(origin).host !== host) throw new Error("origin mismatch");
-  } catch {
+  if (!isOriginAllowed(origin, host)) {
     response.status(403).json({ ok: false, code: "ORIGIN_REJECTED" });
     return;
   }
@@ -411,9 +423,7 @@ function requireSameOriginBinary(request: Request, response: Response, next: Nex
   }
   const origin = request.header("origin");
   const host = request.header("host");
-  try {
-    if (!origin || !host || new URL(origin).host !== host) throw new Error("origin mismatch");
-  } catch {
+  if (!isOriginAllowed(origin, host)) {
     response.status(403).json({ ok: false, code: "ORIGIN_REJECTED" });
     return;
   }

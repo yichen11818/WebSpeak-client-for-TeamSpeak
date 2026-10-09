@@ -12,6 +12,7 @@
     "dev": "tsx src/index.ts",
     "build": "tsc",
     "test": "node --import tsx --test src/admin/skin-registry.test.ts src/server/visitor-count.test.ts web/src/services/skin-catalog.test.ts web/src/services/skin-pack.test.ts",
+    "reset:password": "node --import tsx scripts/reset-admin-password.mjs",
     "start": "node dist/index.js",
     "web:dev": "cd web && npx vite --host",
     "web:build": "cd web && npx vite build",

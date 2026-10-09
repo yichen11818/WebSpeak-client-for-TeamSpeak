@@ -1,5 +1,5 @@
 <template>
-  <div :class="['web-client', 'ws-skin-root', `language-${language}`, { 'skin-initializing': !skinReady }]" data-ws-part="app" :data-ws-page="voiceState.connected || voiceState.reconnecting || voiceState.reconnectFailed ? 'voice' : 'home'">
+  <div :class="['web-client', 'ws-skin-root', `language-${language}`, { 'skin-initializing': !skinReady }]" :data-ws-skin="activeSkinId" data-ws-part="app" :data-ws-page="voiceState.connected || voiceState.reconnecting || voiceState.reconnectFailed ? 'voice' : 'home'">
     <!-- Connection / welcome screen -->
     <section v-if="!voiceState.connected && !voiceState.reconnecting && !voiceState.reconnectFailed" class="join-page" data-ws-part="home">
       <header class="join-header" data-ws-part="home.header">
@@ -102,7 +102,336 @@
       </div>
     </section>
 
-    <!-- Connected application shell -->
+    <!-- Discord 1:1 Authentic Replicated Connected App Shell -->
+    <div
+      v-else-if="activeSkinId === 'builtin.discord'"
+      :class="['app-shell', 'discord-app-shell', { 'discord-chat-closed': !showDiscordChat }]"
+      data-ws-part="voice.shell"
+      @click="memberMenu = null"
+    >
+      <!-- 1. Guild Navigation Rail (Leftmost 72px) -->
+      <nav class="demo-guild-rail">
+        <div class="guild-pill-active"></div>
+        <div class="guild-item">
+          <button type="button" class="guild-icon active" :title="siteName || 'WebSpeak'">
+            <Icon name="discord" :size="28" />
+          </button>
+        </div>
+        <div class="guild-separator"></div>
+        <div class="guild-item">
+          <button type="button" class="guild-icon active" :title="serverHost || 'TeamSpeak Server'">
+            <span>TS</span>
+          </button>
+          <span class="guild-badge">{{ currentMembers.length }}</span>
+        </div>
+        <div class="guild-item">
+          <button type="button" class="guild-icon guild-action" :title="t('copyInvite')" @click="doShare">
+            <Icon name="plus" :size="20" />
+          </button>
+        </div>
+        <div class="guild-item">
+          <button type="button" class="guild-icon guild-action" :title="t('qqGroup')" @click="qqModalOpen = true">
+            <Icon name="compass" :size="20" />
+          </button>
+        </div>
+        <div class="guild-separator"></div>
+        <div class="guild-item">
+          <a class="guild-icon guild-action guild-download" href="https://github.com/EchoSixHIYA/WebSpeak-client-for-TeamSpeak" target="_blank" rel="noreferrer" :title="t('githubRepository')">
+            <Icon name="download" :size="20" />
+          </a>
+        </div>
+      </nav>
+
+      <!-- 2. Server Channels & Members Sidebar (240px) -->
+      <aside class="demo-channel-panel member-panel" data-ws-part="voice.member-panel">
+        <div class="discord-server-card" :title="t('copyInvite')" @click="doShare">
+          <div class="discord-server-card-content">
+            <span class="discord-server-card-avatar">👾</span>
+            <strong>{{ serverHost || 'TeamSpeak Server' }}</strong>
+            <Icon name="chevron-down" :size="15" class="discord-server-chevron" />
+          </div>
+        </div>
+
+        <div class="discord-channels-scroll-area">
+          <div class="discord-voice-category-heading">
+            <Icon name="chevron-down" :size="11" />
+            <span>VOICE CHANNELS</span>
+          </div>
+
+          <div
+            v-for="channelItem in filteredMemberChannels"
+            :key="channelItem.id"
+            :class="['demo-channel', { active: currentChannel?.id === channelItem.id }]"
+            data-ws-part="voice.channel-group"
+          >
+            <button
+              type="button"
+              data-ws-part="voice.channel-group.heading"
+              @click="selectChannel(channelItem)"
+            >
+              <Icon name="volume" :size="16" />
+              <span>{{ channelItem.name }}</span>
+              <small>{{ channelItem.members.length }}</small>
+            </button>
+            <div class="demo-channel-members" data-ws-part="voice.channel-group.members">
+              <span
+                v-for="member in channelItem.members"
+                :key="member.id"
+                :class="{ speaking: isSpeaking(member) }"
+                @contextmenu.prevent="openMemberMenu(member, $event)"
+              >
+                <i :style="avatarStyle(member.nickname, member.isSelf, member.avatar)">{{ member.avatar ? '' : avatarInitial(member.nickname) }}</i>
+                {{ memberDisplayName(member) }}
+              </span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Discord Voice Connected Strip -->
+        <div class="discord-connected-strip">
+          <div class="discord-connected-left">
+            <span class="discord-connected-signal">
+              <Icon name="waveform" :size="16" />
+            </span>
+            <div class="discord-connected-copy">
+              <strong>语音已连接</strong>
+              <small>{{ currentChannelName }} / {{ performanceStats.gatewayLatencyMs != null ? `${performanceStats.gatewayLatencyMs}ms` : 'RTC' }}</small>
+            </div>
+          </div>
+          <button type="button" class="discord-disconnect-btn" :title="t('exit')" @click="doDisconnect">
+            <Icon name="door" :size="17" />
+          </button>
+        </div>
+
+        <!-- Discord Bottom Left Pinned User Profile & Controls Dock -->
+        <div class="discord-user-bar" data-ws-part="voice.audio-dock">
+          <div class="discord-user-info">
+            <div class="discord-avatar-wrap">
+              <i :style="avatarStyle(nickname, true)">{{ avatarInitial(nickname) }}</i>
+              <span class="discord-status-dot"></span>
+            </div>
+            <div class="discord-user-text">
+              <strong>{{ nickname }}</strong>
+              <small>#0001 · 在线</small>
+            </div>
+          </div>
+          <div class="discord-user-actions">
+            <button
+              type="button"
+              class="discord-icon-btn"
+              :class="{ muted: microphoneMuted }"
+              :title="microphoneMuted ? t('unmuteMic') : t('muteMic')"
+              @click="toggleMicrophone"
+            >
+              <Icon :name="microphoneMuted ? 'mic-off' : 'mic'" :size="18" />
+            </button>
+            <button
+              type="button"
+              class="discord-icon-btn"
+              :class="{ muted: outputMuted }"
+              :title="outputMuted ? t('unmuteOutput') : t('muteOutput')"
+              @click="toggleOutputMute"
+            >
+              <Icon :name="outputMuted ? 'volume-off' : 'headset'" :size="18" />
+            </button>
+            <button
+              type="button"
+              class="discord-icon-btn"
+              :title="t('audioSettings')"
+              @click="settingsOpen = true"
+            >
+              <Icon name="settings" :size="18" />
+            </button>
+          </div>
+        </div>
+      </aside>
+
+      <!-- 3. Central Stage: Voice & Video Stage -->
+      <section class="demo-main workspace" data-ws-part="voice.workspace">
+        <div class="discord-stage-header">
+          <div class="discord-channel-title">
+            <Icon name="volume" :size="20" class="discord-channel-icon" />
+            <h2>{{ currentChannelName }}</h2>
+          </div>
+          <div class="discord-stage-header-actions">
+            <button
+              type="button"
+              class="discord-header-btn"
+              :class="{ active: showDiscordChat }"
+              :title="showDiscordChat ? '隐藏文字聊天' : '显示文字聊天'"
+              @click="showDiscordChat = !showDiscordChat"
+            >
+              <Icon name="message" :size="19" />
+            </button>
+            <button
+              type="button"
+              class="discord-header-btn"
+              :title="t('copyInvite')"
+              @click="doShare"
+            >
+              <Icon name="share" :size="18" />
+            </button>
+            <SkinSwitcher v-model="activeSkinId" class="workspace-skin-switcher" :menu-label="t('skinSelector')" :options="skinOptions" @change="onSkinChange" />
+            <LanguageSwitcher v-model="language" class="workspace-language" :menu-label="t('languageMenu')" @change="persistLanguage" />
+            <button class="disconnect-button" :title="t('exit')" @click="doDisconnect">
+              <Icon name="door" :size="17" />
+            </button>
+          </div>
+        </div>
+
+        <div class="discord-stage-canvas">
+          <!-- Video Screen Share Player if remote/local stream active -->
+          <div v-if="screenShareViewing" class="screen-share-player discord-screenshare-stage" data-ws-part="voice.screen-player">
+            <video v-if="screenShareRemoteStream" :ref="setScreenVideoElement" class="screen-share-player-video" autoplay playsinline :muted="screenShareRemoteVolume === 0"></video>
+            <div v-else class="screen-share-player-placeholder">
+              <Icon name="monitor" :size="36" />
+              <strong>{{ t('screenShareConnecting') }}</strong>
+            </div>
+            <button type="button" class="screen-share-player-exit" :title="t('screenShareExit')" @click="leaveScreenShare"><Icon name="close" :size="20" /></button>
+          </div>
+
+          <!-- Speakers Grid -->
+          <div v-else class="discord-speakers-grid">
+            <div
+              v-for="member in currentMembers"
+              :key="member.id"
+              :class="['discord-speaker-card', { speaking: isSpeaking(member) }]"
+              data-ws-part="voice.member"
+            >
+              <div class="discord-speaker-avatar">
+                <i :style="avatarStyle(member.nickname, member.isSelf, member.avatar)">
+                  {{ member.avatar ? '' : avatarInitial(member.nickname) }}
+                </i>
+              </div>
+              <div class="discord-speaker-tag">
+                <span class="discord-speaker-name">{{ member.isSelf ? `${member.nickname} (${t('you')})` : member.nickname }}</span>
+              </div>
+            </div>
+            <!-- If no other speaker, show Room Art Card -->
+            <div v-if="currentMembers.length <= 1" class="discord-speaker-card stage-artwork-card">
+              <div class="discord-stage-artwork">
+                <span class="discord-trophy-emoji">🏆</span>
+                <span class="discord-shield-emoji">🛡️</span>
+                <span class="discord-gem-emoji">💎</span>
+              </div>
+              <div class="discord-invite-stage-btn-wrap">
+                <button type="button" class="discord-stage-invite-btn" @click="doShare">
+                  <Icon name="users" :size="15" />
+                  <span>邀请朋友加入语音</span>
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Bottom Voice Floating Control Bar in Stage -->
+          <div class="discord-floating-controls">
+            <button
+              type="button"
+              class="stage-ctrl-btn"
+              :class="{ danger: microphoneMuted }"
+              :title="microphoneMuted ? t('unmuteMic') : t('muteMic')"
+              @click="toggleMicrophone"
+            >
+              <Icon :name="microphoneMuted ? 'mic-off' : 'mic'" :size="19" />
+            </button>
+            <button
+              type="button"
+              class="stage-ctrl-btn"
+              :class="{ active: screenShareActive }"
+              :title="screenShareActive ? t('stopScreenShare') : t('startScreenShare')"
+              @click="screenShareActive ? stopScreenShare() : startScreenShareWithSettings()"
+            >
+              <Icon name="monitor" :size="19" />
+            </button>
+            <button
+              type="button"
+              class="stage-ctrl-btn"
+              :class="{ muted: outputMuted }"
+              :title="outputMuted ? t('unmuteOutput') : t('muteOutput')"
+              @click="toggleOutputMute"
+            >
+              <Icon :name="outputMuted ? 'volume-off' : 'headset'" :size="19" />
+            </button>
+            <button
+              type="button"
+              class="stage-ctrl-btn danger-disconnect"
+              :title="t('exit')"
+              @click="doDisconnect"
+            >
+              <Icon name="door" :size="19" />
+            </button>
+          </div>
+        </div>
+      </section>
+
+      <!-- 4. Right Column: Discord Channel Chat Panel -->
+      <aside v-if="showDiscordChat" class="demo-actions-panel chat-panel" data-ws-part="voice.chat">
+        <div class="discord-chat-sidebar-header">
+          <div class="discord-chat-title">
+            <Icon name="hash" :size="18" />
+            <strong>{{ currentChannelName }}</strong>
+          </div>
+          <div class="discord-chat-header-actions">
+            <button
+              type="button"
+              class="discord-chat-close-btn"
+              title="收起文字聊天"
+              @click="showDiscordChat = false"
+            >
+              <Icon name="close" :size="16" />
+            </button>
+          </div>
+        </div>
+
+        <div ref="chatListEl" class="discord-channel-chat-stream" data-ws-part="voice.chat.messages">
+          <div class="discord-chat-welcome">
+            <div class="discord-welcome-hash-circle">
+              <Icon name="hash" :size="32" />
+            </div>
+            <h2>欢迎来到 {{ currentChannelName }}!</h2>
+            <p>这是 #{{ currentChannelName }} 频道的起点。</p>
+          </div>
+
+          <div class="discord-date-divider">
+            <span>{{ new Date().toLocaleDateString() }}</span>
+          </div>
+
+          <div
+            v-for="message in visibleChatMessages"
+            :key="message.id"
+            class="discord-chat-row"
+            :class="{ mine: message.isSelf }"
+            data-ws-part="voice.chat.message"
+          >
+            <div class="discord-row-avatar">
+              <i :style="avatarStyle(message.invokerName, message.isSelf, messageAvatar(message))">
+                {{ messageAvatar(message) ? '' : avatarInitial(message.invokerName) }}
+              </i>
+            </div>
+            <div class="discord-row-content">
+              <div class="discord-row-header">
+                <span class="discord-row-author">{{ message.isSelf ? t('you') : message.invokerName }}</span>
+                <span class="discord-row-time">{{ formatTime(message.timestamp) }}</span>
+              </div>
+              <p class="discord-row-text">{{ message.message }}</p>
+            </div>
+          </div>
+        </div>
+
+        <form class="discord-channel-composer" data-ws-part="voice.chat.composer" @submit.prevent="submitMessage">
+          <div class="discord-composer-wrap">
+            <input v-model="messageDraft" maxlength="500" :placeholder="chatPlaceholder" :aria-label="t('send')" />
+            <div class="discord-composer-actions">
+              <button type="submit" class="discord-composer-send" :disabled="!messageDraft.trim()" :title="t('send')">
+                <Icon name="send" :size="16" />
+              </button>
+            </div>
+          </div>
+        </form>
+      </aside>
+    </div>
+
+    <!-- Connected application shell (Default & Other Themes) -->
     <div v-else :class="['app-shell', `mobile-view-${mobileSection}`]" :data-performance-open="performancePanelOpen ? 'true' : 'false'" data-ws-part="voice.shell" @click="memberMenu = null">
       <main class="workspace" data-ws-part="voice.workspace">
         <header class="workspace-header" data-ws-part="voice.header">
@@ -506,6 +835,7 @@ const localPersistenceAvailable = isLocalPersistenceAvailable();
 const identityReady = ref(!localPersistenceAvailable);
 const mobileSection = ref<"channels" | "chat" | "voice" | "more">("channels");
 const isMobileViewport = ref(false);
+const showDiscordChat = ref(true);
 let toastTimer: ReturnType<typeof setTimeout> | undefined;
 
 const language = ref<Language>(getInitialLanguage());
@@ -552,14 +882,14 @@ applyTheme(themeMode.value);
 if (localStorage.getItem("webspeak:theme") === "system") saveTheme(themeMode.value);
 const storedSkinId = getStoredSkinId();
 const activeSkinId = ref(storedSkinId ?? (themeMode.value === "dark" ? BUILTIN_DARK_SKIN : BUILTIN_LIGHT_SKIN));
-const skinReady = ref(storedSkinId === BUILTIN_LIGHT_SKIN || storedSkinId === BUILTIN_DARK_SKIN);
+const skinReady = ref(storedSkinId === BUILTIN_LIGHT_SKIN || storedSkinId === BUILTIN_DARK_SKIN || storedSkinId === "builtin.discord");
 const installedSkins = ref<InstalledSkin[]>([]);
 const catalogSkins = ref<SkinCatalogEntry[]>([]);
 const skinOptions = computed<SkinOption[]>(() => [
   ...catalogSkins.value.map((skin) => ({
     value: skin.id,
-    label: skin.id === BUILTIN_LIGHT_SKIN ? t("skinDay") : skin.id === BUILTIN_DARK_SKIN ? t("skinNight") : skin.id === "community.illusia-voice" ? t("skinIllusia") : skin.name,
-    icon: skin.id === BUILTIN_LIGHT_SKIN ? "sun" : skin.id === BUILTIN_DARK_SKIN ? "moon" : "compass",
+    label: skin.id === BUILTIN_LIGHT_SKIN ? t("skinDay") : skin.id === BUILTIN_DARK_SKIN ? t("skinNight") : skin.id === "builtin.discord" ? "Discord" : skin.id === "community.illusia-voice" ? t("skinIllusia") : skin.name,
+    icon: skin.id === BUILTIN_LIGHT_SKIN ? "sun" : skin.id === BUILTIN_DARK_SKIN ? "moon" : skin.id === "builtin.discord" ? "discord" : "compass",
   })),
   ...installedSkins.value.filter((skin) => !catalogSkins.value.some((item) => item.id === skin.id) && isPublicSkinEnabled(skin.id)).map((skin) => ({ value: skin.id, label: skin.name, icon: "compass" })),
 ]);
@@ -658,6 +988,7 @@ async function onSkinChange(skinId: string) {
   activeSkinId.value = getStoredSkinId() ?? skinId;
   if (skinId === BUILTIN_LIGHT_SKIN) themeMode.value = "light";
   else if (skinId === BUILTIN_DARK_SKIN) themeMode.value = "dark";
+  else if (skinId === "builtin.discord") themeMode.value = "dark";
   else themeMode.value = resolveSkinMode(getStoredTheme());
   void saveLocalPreferences({ schemaVersion: 1, theme: themeMode.value, skinId: activeSkinId.value });
 }
@@ -688,6 +1019,7 @@ async function initializeSkin(): Promise<void> {
     activeSkinId.value = getStoredSkinId() ?? preferredSkinId;
     if (activeSkinId.value === BUILTIN_LIGHT_SKIN) themeMode.value = "light";
     else if (activeSkinId.value === BUILTIN_DARK_SKIN) themeMode.value = "dark";
+    else if (activeSkinId.value === "builtin.discord") themeMode.value = "dark";
     else themeMode.value = resolveSkinMode(getStoredTheme());
     void saveLocalPreferences({ schemaVersion: 1, theme: themeMode.value, skinId: activeSkinId.value });
   } catch {

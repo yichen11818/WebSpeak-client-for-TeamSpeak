@@ -10,10 +10,11 @@ export interface SkinCatalogEntry {
   installedAt: number;
   builtIn?: boolean;
   enabled?: boolean;
-  previewKind?: "day" | "night" | "illusia";
+  previewKind?: "day" | "night" | "illusia" | "discord";
 }
 
 export const BUILTIN_ILLUSIA_SKIN_ID = "community.illusia-voice";
+export const BUILTIN_DISCORD_SKIN_ID = "builtin.discord";
 
 export const BUILTIN_SKIN_CATALOG: SkinCatalogEntry[] = [
   {
@@ -39,6 +40,18 @@ export const BUILTIN_SKIN_CATALOG: SkinCatalogEntry[] = [
     installedAt: 0,
     builtIn: true,
     previewKind: "night",
+  },
+  {
+    id: BUILTIN_DISCORD_SKIN_ID,
+    name: "Discord",
+    version: "1.0.0",
+    author: "WebSpeak",
+    license: "AGPL-3.0-only",
+    description: "Discord 1:1 authentic dark theme.",
+    minAppVersion: "0.2.5",
+    installedAt: 0,
+    builtIn: true,
+    previewKind: "discord",
   },
   {
     id: BUILTIN_ILLUSIA_SKIN_ID,

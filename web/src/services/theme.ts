@@ -1,9 +1,11 @@
-export type ThemeMode = "system" | "light" | "dark";
+export type ThemeMode = "system" | "light" | "dark" | "discord";
 
 import lightManifest from "../skins/builtin/light/manifest.json";
 import lightCss from "../skins/builtin/light/skin.css?inline";
 import darkManifest from "../skins/builtin/dark/manifest.json";
 import darkCss from "../skins/builtin/dark/skin.css?inline";
+import discordManifest from "../skins/builtin/discord/manifest.json";
+import discordCss from "../skins/builtin/discord/skin.css?inline";
 
 const THEME_KEY = "webspeak:theme";
 const SKIN_STYLE_ELEMENT_ID = "webspeak-active-built-in-skin";
@@ -12,29 +14,35 @@ let activeThemeMode: ThemeMode = "system";
 const builtinSkins = {
   light: { manifest: lightManifest, css: lightCss },
   dark: { manifest: darkManifest, css: darkCss },
+  discord: { manifest: discordManifest, css: discordCss },
 } as const;
 
 export function getBuiltinSkinCss(theme: Exclude<ThemeMode, "system">): string {
+  if (theme === "discord") return builtinSkins.discord.css;
   return theme === "dark" ? builtinSkins.dark.css : builtinSkins.light.css;
 }
 
 export function getStoredTheme(): ThemeMode {
   const value = typeof localStorage === "undefined" ? "" : localStorage.getItem(THEME_KEY);
-  return value === "light" || value === "dark" || value === "system" ? value : "system";
+  return value === "light" || value === "dark" || value === "discord" || value === "system" ? value : "system";
 }
 
 export function applyTheme(theme: ThemeMode, options: { preserveCustomSkins?: boolean } = {}): void {
   if (typeof document === "undefined") return;
   activeThemeMode = theme;
   const root = document.documentElement;
-  const activeSkin = isDarkTheme(theme) ? builtinSkins.dark : builtinSkins.light;
+  const activeSkin = theme === "discord"
+    ? builtinSkins.discord
+    : (isDarkTheme(theme) ? builtinSkins.dark : builtinSkins.light);
 
   // Keep data-theme for the admin console's independent appearance rules.
   // Built-in skin CSS is scoped to public roots and can never restyle /admin.
   root.dataset.theme = theme;
   document.querySelectorAll<HTMLElement>(".ws-skin-root").forEach((clientRoot) => {
     const currentSkin = clientRoot.dataset.wsSkin;
-    const isCustomSkin = currentSkin !== builtinSkins.light.manifest.id && currentSkin !== builtinSkins.dark.manifest.id;
+    const isCustomSkin = currentSkin !== builtinSkins.light.manifest.id &&
+      currentSkin !== builtinSkins.dark.manifest.id &&
+      currentSkin !== builtinSkins.discord.manifest.id;
     if (options.preserveCustomSkins && currentSkin && isCustomSkin) return;
     clientRoot.dataset.wsSkin = activeSkin.manifest.id;
   });

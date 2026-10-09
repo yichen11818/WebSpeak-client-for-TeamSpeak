@@ -60,7 +60,7 @@ const emit = defineEmits<{
 }>();
 
 const options = computed(() => props.options);
-const selectedOption = computed(() => options.value.find((option) => option.value === props.modelValue) ?? options.value[0]);
+const selectedOption = computed(() => options.value.find((option) => option.value === props.modelValue) ?? options.value[0] ?? { value: props.modelValue, label: props.menuLabel, icon: "compass" });
 const root = ref<HTMLElement | null>(null);
 const open = ref(false);
 const menuId = `skin-menu-${Math.random().toString(36).slice(2, 9)}`;
